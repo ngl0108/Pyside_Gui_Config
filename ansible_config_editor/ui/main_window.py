@@ -9,8 +9,8 @@ from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction
 
-from core.playbook_manager import ConfigManager
-from core.ansible_engine import AnsibleEngine
+from ansible_config_editor.core.playbook_manager import ConfigManager
+from ansible_config_editor.core.ansible_engine import AnsibleEngine
 
 
 class MainWindow(QMainWindow):
@@ -35,7 +35,6 @@ class MainWindow(QMainWindow):
         device_layout = QVBoxLayout()
 
         self.combo_os_type = QComboBox()
-        # [수정된 부분] OS 유형 리스트 추가
         os_types = [
             "L2_IOS-XE",
             "L3_IOS-XE",
@@ -67,9 +66,12 @@ class MainWindow(QMainWindow):
         self.main_tabs.addTab(self._create_global_tab(), "Global")
         self.main_tabs.addTab(self._create_interface_tab(), "Interface")
         self.main_tabs.addTab(self._create_vlan_tab(), "VLAN")
+        # ! --- 추가된 부분 시작 ---
+        self.main_tabs.addTab(self._create_switching_tab(), "Switching")
+        # ! --- 추가된 부분 끝 ---
         self.main_tabs.addTab(self._create_routing_tab(), "Routing")
         self.main_tabs.addTab(self._create_ha_tab(), "HA (고가용성)")
-        self.main_tabs.addTab(self._create_security_tab(), "Security (ACL, SNMP 등)")
+        self.main_tabs.addTab(self._create_security_tab(), "Security")  # ! --- 수정된 부분 ---
 
         config_layout.addWidget(self.main_tabs)
         config_group.setLayout(config_layout)
@@ -110,39 +112,170 @@ class MainWindow(QMainWindow):
         self.le_hostname.setPlaceholderText("예: SW-CORE-01")
         self.cb_service_timestamps = QCheckBox()
         self.cb_service_password_encryption = QCheckBox()
+        self.cb_service_call_home = QCheckBox()
         form_hostname.addRow("Hostname:", self.le_hostname)
-        form_hostname.addRow("service timestamps debug/log...", self.cb_service_timestamps)
+        form_hostname.addRow("service timestamps debug/log", self.cb_service_timestamps)
         form_hostname.addRow("service password-encryption", self.cb_service_password_encryption)
+        form_hostname.addRow("no service call-home", self.cb_service_call_home)
         group_hostname.setLayout(form_hostname)
         layout.addWidget(group_hostname)
+
+        # DNS & Domain
+        group_dns = QGroupBox("DNS & Domain")
+        form_dns = QFormLayout()
+        self.le_domain_name = QLineEdit()
+        self.le_domain_name.setPlaceholderText("예: company.com")
+        self.dns_table = QTableWidget(0, 2)
+        self.dns_table.setHorizontalHeaderLabels(["DNS 서버 IP", "VRF (선택사항)"])
+        self.dns_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.btn_add_dns = QPushButton("DNS 서버 추가")
+        self.btn_remove_dns = QPushButton("DNS 서버 삭제")
+        form_dns.addRow("Domain Name:", self.le_domain_name)
+        form_dns.addRow(self.btn_add_dns, self.btn_remove_dns)
+        form_dns.addRow("DNS Servers:", self.dns_table)
+        group_dns.setLayout(form_dns)
+        layout.addWidget(group_dns)
+
+        # Clock & Timezone
+        group_clock = QGroupBox("Clock & Timezone")
+        form_clock = QFormLayout()
+        self.combo_timezone = QComboBox()
+        timezones = [
+            "UTC 0", "KST 9", "JST 9", "CST 8", "EST -5",
+            "PST -8", "GMT 0", "CET 1", "Custom"
+        ]
+        self.combo_timezone.addItems(timezones)
+        self.combo_timezone.setCurrentText("KST 9")  # 기본값 한국 시간
+        self.le_custom_timezone = QLineEdit()
+        self.le_custom_timezone.setPlaceholderText("예: Asia/Seoul")
+        self.le_custom_timezone.setEnabled(False)
+        form_clock.addRow("Timezone:", self.combo_timezone)
+        form_clock.addRow("Custom Timezone:", self.le_custom_timezone)
+        group_clock.setLayout(form_clock)
+        layout.addWidget(group_clock)
 
         # Logging
         group_logging = QGroupBox("Logging")
         form_logging = QFormLayout()
+        self.combo_logging_level = QComboBox()
+        self.combo_logging_level.addItems([
+            "informational (6)", "warnings (4)", "errors (3)",
+            "critical (2)", "debugging (7)"
+        ])
+        self.combo_logging_level.setCurrentText("informational (6)")
+        self.cb_logging_console = QCheckBox()
+        self.cb_logging_console.setChecked(True)
+        self.cb_logging_buffered = QCheckBox()
+        self.cb_logging_buffered.setChecked(True)
+        self.le_logging_buffer_size = QLineEdit()
+        self.le_logging_buffer_size.setPlaceholderText("예: 32000")
+        self.le_logging_buffer_size.setText("32000")
+
         self.logging_table = QTableWidget(0, 2)
-        # [수정된 부분] 헤더 라벨 추가
         self.logging_table.setHorizontalHeaderLabels(["로깅 서버 IP", "VRF (선택사항)"])
         self.logging_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.btn_add_log_host = QPushButton("로깅 서버 추가")
         self.btn_remove_log_host = QPushButton("로깅 서버 삭제")
+
+        form_logging.addRow("Logging Level:", self.combo_logging_level)
+        form_logging.addRow("Console Logging:", self.cb_logging_console)
+        form_logging.addRow("Buffered Logging:", self.cb_logging_buffered)
+        form_logging.addRow("Buffer Size:", self.le_logging_buffer_size)
         form_logging.addRow(self.btn_add_log_host, self.btn_remove_log_host)
-        form_logging.addRow(self.logging_table)
+        form_logging.addRow("Remote Logging Hosts:", self.logging_table)
         group_logging.setLayout(form_logging)
         layout.addWidget(group_logging)
 
         # NTP
         group_ntp = QGroupBox("NTP")
         form_ntp = QFormLayout()
-        self.ntp_table = QTableWidget(0, 3)
-        # [수정된 부분] 헤더 라벨 추가
-        self.ntp_table.setHorizontalHeaderLabels(["NTP 서버 IP", "Prefer (선택)", "VRF (선택사항)"])
+        self.cb_ntp_authenticate = QCheckBox()
+        self.le_ntp_master_stratum = QLineEdit()
+        self.le_ntp_master_stratum.setPlaceholderText("예: 8 (없으면 비워두세요)")
+        self.ntp_table = QTableWidget(0, 4)
+        self.ntp_table.setHorizontalHeaderLabels(["NTP 서버 IP", "Prefer", "Key ID", "VRF"])
         self.ntp_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.btn_add_ntp = QPushButton("NTP 서버 추가")
         self.btn_remove_ntp = QPushButton("NTP 서버 삭제")
+
+        form_ntp.addRow("NTP Authentication:", self.cb_ntp_authenticate)
+        form_ntp.addRow("Master Stratum:", self.le_ntp_master_stratum)
         form_ntp.addRow(self.btn_add_ntp, self.btn_remove_ntp)
-        form_ntp.addRow(self.ntp_table)
+        form_ntp.addRow("NTP Servers:", self.ntp_table)
         group_ntp.setLayout(form_ntp)
         layout.addWidget(group_ntp)
+
+        # Management Interface
+        group_mgmt = QGroupBox("Management Interface")
+        form_mgmt = QFormLayout()
+        self.combo_mgmt_interface = QComboBox()
+        mgmt_interfaces = [
+            "None", "GigabitEthernet0/0", "Management1", "Management0",
+            "Vlan1", "FastEthernet0", "Custom"
+        ]
+        self.combo_mgmt_interface.addItems(mgmt_interfaces)
+        self.le_custom_mgmt_interface = QLineEdit()
+        self.le_custom_mgmt_interface.setPlaceholderText("예: GigabitEthernet1/0/1")
+        self.le_custom_mgmt_interface.setEnabled(False)
+        self.le_mgmt_ip = QLineEdit()
+        self.le_mgmt_ip.setPlaceholderText("예: 192.168.1.100")
+        self.le_mgmt_subnet = QLineEdit()
+        self.le_mgmt_subnet.setPlaceholderText("예: 255.255.255.0 또는 /24")
+        self.le_mgmt_gateway = QLineEdit()
+        self.le_mgmt_gateway.setPlaceholderText("예: 192.168.1.1")
+        self.le_mgmt_vrf = QLineEdit()
+        self.le_mgmt_vrf.setPlaceholderText("예: Mgmt-intf (선택사항)")
+
+        form_mgmt.addRow("Management Interface:", self.combo_mgmt_interface)
+        form_mgmt.addRow("Custom Interface:", self.le_custom_mgmt_interface)
+        form_mgmt.addRow("IP Address:", self.le_mgmt_ip)
+        form_mgmt.addRow("Subnet Mask:", self.le_mgmt_subnet)
+        form_mgmt.addRow("Gateway:", self.le_mgmt_gateway)
+        form_mgmt.addRow("VRF:", self.le_mgmt_vrf)
+        group_mgmt.setLayout(form_mgmt)
+        layout.addWidget(group_mgmt)
+
+        # Banner
+        group_banner = QGroupBox("Login Banner")
+        banner_layout = QVBoxLayout()
+        self.cb_enable_banner = QCheckBox("Enable Login Banner")
+        self.te_banner_text = QPlainTextEdit()
+        self.te_banner_text.setMaximumHeight(100)
+        self.te_banner_text.setPlaceholderText(
+            "예:\n"
+            "********************************\n"
+            "* Authorized Access Only      *\n"
+            "* All activities monitored    *\n"
+            "********************************"
+        )
+        self.te_banner_text.setEnabled(False)
+        banner_layout.addWidget(self.cb_enable_banner)
+        banner_layout.addWidget(QLabel("Banner Text:"))
+        banner_layout.addWidget(self.te_banner_text)
+        group_banner.setLayout(banner_layout)
+        layout.addWidget(group_banner)
+
+        # Archive & Configuration Management
+        group_archive = QGroupBox("Configuration Archive")
+        form_archive = QFormLayout()
+        self.cb_archive_config = QCheckBox("Enable Configuration Archive")
+        self.le_archive_path = QLineEdit()
+        self.le_archive_path.setPlaceholderText("예: bootflash:archive")
+        self.le_archive_path.setEnabled(False)
+        self.le_archive_max_files = QLineEdit()
+        self.le_archive_max_files.setPlaceholderText("예: 10")
+        self.le_archive_max_files.setEnabled(False)
+        self.cb_archive_time_period = QCheckBox("Time-based Archive")
+        self.le_archive_time_period = QLineEdit()
+        self.le_archive_time_period.setPlaceholderText("예: 1440 (minutes)")
+        self.le_archive_time_period.setEnabled(False)
+
+        form_archive.addRow(self.cb_archive_config)
+        form_archive.addRow("Archive Path:", self.le_archive_path)
+        form_archive.addRow("Max Files:", self.le_archive_max_files)
+        form_archive.addRow(self.cb_archive_time_period, self.le_archive_time_period)
+        group_archive.setLayout(form_archive)
+        layout.addWidget(group_archive)
 
         layout.addStretch()
         return tab
@@ -198,6 +331,28 @@ class MainWindow(QMainWindow):
         layout.addStretch()
         return tab
 
+    # ! --- 추가된 부분 시작 ---
+    def _create_switching_tab(self):
+        tab, layout = self._create_scrollable_tab()
+
+        # Spanning Tree
+        group_stp = QGroupBox("Spanning Tree Protocol")
+        form_stp = QFormLayout()
+        self.combo_stp_mode = QComboBox()
+        self.combo_stp_mode.addItems(["pvst", "rapid-pvst", "mst"])
+        self.cb_stp_portfast_default = QCheckBox("spanning-tree portfast default")
+        self.cb_stp_bpduguard_default = QCheckBox("spanning-tree portfast bpduguard default")
+        form_stp.addRow("STP Mode:", self.combo_stp_mode)
+        form_stp.addRow(self.cb_stp_portfast_default)
+        form_stp.addRow(self.cb_stp_bpduguard_default)
+        group_stp.setLayout(form_stp)
+        layout.addWidget(group_stp)
+
+        layout.addStretch()
+        return tab
+
+    # ! --- 추가된 부분 끝 ---
+
     def _create_routing_tab(self):
         tab, layout = self._create_scrollable_tab()
         layout.addWidget(QLabel("Static, OSPF, BGP, VRRP 등 라우팅 설정 기능이 여기에 구현됩니다."))
@@ -217,24 +372,96 @@ class MainWindow(QMainWindow):
         group_aaa = QGroupBox("AAA")
         form_aaa = QFormLayout()
         self.cb_aaa_new_model = QCheckBox("aaa new-model 활성화")
+        self.le_aaa_auth_login = QLineEdit()
+        self.le_aaa_auth_login.setPlaceholderText("예: default group tacacs+ local")
+        self.le_aaa_auth_exec = QLineEdit()
+        self.le_aaa_auth_exec.setPlaceholderText("예: default group tacacs+ local")
+
         self.aaa_server_table = QTableWidget(0, 3)
         self.aaa_server_table.setHorizontalHeaderLabels(["서버 종류 (tacacs+/radius)", "그룹 이름", "서버 IP 리스트 (쉼표로 구분)"])
         self.aaa_server_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.btn_add_aaa_group = QPushButton("AAA 서버 그룹 추가")
         self.btn_remove_aaa_group = QPushButton("AAA 서버 그룹 삭제")
+
         form_aaa.addRow(self.cb_aaa_new_model)
+        form_aaa.addRow("Authentication Login:", self.le_aaa_auth_login)
+        form_aaa.addRow("Authorization Exec:", self.le_aaa_auth_exec)
         form_aaa.addRow(self.btn_add_aaa_group, self.btn_remove_aaa_group)
-        form_aaa.addRow(self.aaa_server_table)
+        form_aaa.addRow("AAA Server Groups:", self.aaa_server_table)
         group_aaa.setLayout(form_aaa)
         layout.addWidget(group_aaa)
 
-        # ACL
-        group_acl = QGroupBox("Access Control Lists (ACL)")
-        layout.addWidget(group_acl)  # 추후 상세 구현
+        # ! --- 추가된 부분 시작 ---
+        # Local Users
+        group_users = QGroupBox("Local User Accounts")
+        users_layout = QVBoxLayout()
+        self.users_table = QTableWidget(0, 3)
+        self.users_table.setHorizontalHeaderLabels(["Username", "Privilege (1-15)", "Password"])
+        self.users_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        users_button_layout = QHBoxLayout()
+        self.btn_add_user = QPushButton("사용자 추가")
+        self.btn_remove_user = QPushButton("사용자 삭제")
+        users_button_layout.addWidget(self.btn_add_user)
+        users_button_layout.addWidget(self.btn_remove_user)
+        users_layout.addLayout(users_button_layout)
+        users_layout.addWidget(self.users_table)
+        group_users.setLayout(users_layout)
+        layout.addWidget(group_users)
+
+        # Line Configuration
+        group_line = QGroupBox("Line Configuration (Console/VTY)")
+        form_line = QFormLayout()
+        self.le_con_exec_timeout = QLineEdit("15 0")
+        self.cb_con_logging_sync = QCheckBox()
+        self.cb_con_logging_sync.setChecked(True)
+        self.le_vty_exec_timeout = QLineEdit("15 0")
+        self.combo_vty_transport = QComboBox()
+        self.combo_vty_transport.addItems(["ssh", "telnet", "none", "all"])
+        self.combo_vty_transport.setCurrentText("ssh")
+        form_line.addRow("Console Timeout (min sec):", self.le_con_exec_timeout)
+        form_line.addRow("Console Logging Synchronous:", self.cb_con_logging_sync)
+        form_line.addRow("VTY Timeout (min sec):", self.le_vty_exec_timeout)
+        form_line.addRow("VTY Transport Input:", self.combo_vty_transport)
+        group_line.setLayout(form_line)
+        layout.addWidget(group_line)
 
         # SNMP
         group_snmp = QGroupBox("SNMP")
-        layout.addWidget(group_snmp)  # 추후 상세 구현
+        snmp_layout = QVBoxLayout()
+        self.snmp_community_table = QTableWidget(0, 3)
+        self.snmp_community_table.setHorizontalHeaderLabels(
+            ["Community String", "Permission (RO/RW)", "ACL (Optional)"])
+        self.snmp_community_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        snmp_button_layout = QHBoxLayout()
+        self.btn_add_snmp = QPushButton("Community 추가")
+        self.btn_remove_snmp = QPushButton("Community 삭제")
+        snmp_button_layout.addWidget(self.btn_add_snmp)
+        snmp_button_layout.addWidget(self.btn_remove_snmp)
+        snmp_form = QFormLayout()
+        self.le_snmp_location = QLineEdit()
+        self.le_snmp_contact = QLineEdit()
+        snmp_form.addRow("Location:", self.le_snmp_location)
+        snmp_form.addRow("Contact:", self.le_snmp_contact)
+        snmp_layout.addLayout(snmp_form)
+        snmp_layout.addLayout(snmp_button_layout)
+        snmp_layout.addWidget(self.snmp_community_table)
+        group_snmp.setLayout(snmp_layout)
+        layout.addWidget(group_snmp)
+
+        # Security Hardening
+        group_hardening = QGroupBox("Security Hardening")
+        form_hardening = QFormLayout()
+        self.cb_no_ip_http = QCheckBox("no ip http server")
+        self.cb_no_ip_http.setChecked(True)
+        self.cb_no_cdp = QCheckBox("no cdp run")
+        self.cb_lldp = QCheckBox("lldp run")
+        self.cb_lldp.setChecked(True)
+        form_hardening.addRow(self.cb_no_ip_http)
+        form_hardening.addRow(self.cb_no_cdp)
+        form_hardening.addRow(self.cb_lldp)
+        group_hardening.setLayout(form_hardening)
+        layout.addWidget(group_hardening)
+        # ! --- 추가된 부분 끝 ---
 
         layout.addStretch()
         return tab
@@ -244,29 +471,103 @@ class MainWindow(QMainWindow):
         self.btn_remove_device.clicked.connect(self.ui_remove_device)
         self.btn_apply.clicked.connect(self.run_config_task)
 
-        # 동적으로 생성된 버튼에 대한 연결
+        # Global Tab 시그널 연결
         self.btn_add_log_host.clicked.connect(lambda: self.ui_add_table_row(self.logging_table))
         self.btn_remove_log_host.clicked.connect(lambda: self.ui_remove_table_row(self.logging_table))
         self.btn_add_ntp.clicked.connect(lambda: self.ui_add_table_row(self.ntp_table))
         self.btn_remove_ntp.clicked.connect(lambda: self.ui_remove_table_row(self.ntp_table))
+        self.btn_add_dns.clicked.connect(lambda: self.ui_add_table_row(self.dns_table))
+        self.btn_remove_dns.clicked.connect(lambda: self.ui_remove_table_row(self.dns_table))
+
+        # 동적 UI 제어
+        self.combo_timezone.currentTextChanged.connect(self._on_timezone_changed)
+        self.combo_mgmt_interface.currentTextChanged.connect(self._on_mgmt_interface_changed)
+        self.cb_enable_banner.toggled.connect(self.te_banner_text.setEnabled)
+        self.cb_archive_config.toggled.connect(self._on_archive_config_toggled)
+        self.cb_archive_time_period.toggled.connect(self.le_archive_time_period.setEnabled)
+
+        # Security Tab 시그널 연결
         self.btn_add_aaa_group.clicked.connect(lambda: self.ui_add_table_row(self.aaa_server_table))
         self.btn_remove_aaa_group.clicked.connect(lambda: self.ui_remove_table_row(self.aaa_server_table))
+        # ! --- 추가된 부분 시작 ---
+        self.btn_add_user.clicked.connect(lambda: self.ui_add_table_row(self.users_table))
+        self.btn_remove_user.clicked.connect(lambda: self.ui_remove_table_row(self.users_table))
+        self.btn_add_snmp.clicked.connect(lambda: self.ui_add_table_row(self.snmp_community_table))
+        self.btn_remove_snmp.clicked.connect(lambda: self.ui_remove_table_row(self.snmp_community_table))
+        # ! --- 추가된 부분 끝 ---
 
         # VLAN 관리 버튼 연결
         if hasattr(self, 'btn_add_vlan'):
             self.btn_add_vlan.clicked.connect(lambda: self.ui_add_table_row(self.vlan_table))
             self.btn_remove_vlan.clicked.connect(lambda: self.ui_remove_table_row(self.vlan_table))
 
+    def _on_timezone_changed(self, timezone):
+        """타임존 선택 변경 시 커스텀 입력 필드 활성화/비활성화"""
+        self.le_custom_timezone.setEnabled(timezone == "Custom")
+        if timezone != "Custom":
+            self.le_custom_timezone.clear()
+
+    def _on_mgmt_interface_changed(self, interface):
+        """관리 인터페이스 선택 변경 시 커스텀 입력 필드 활성화/비활성화"""
+        self.le_custom_mgmt_interface.setEnabled(interface == "Custom")
+        if interface != "Custom":
+            self.le_custom_mgmt_interface.clear()
+
+    def _on_archive_config_toggled(self, checked):
+        """Configuration Archive 체크박스 변경 시 관련 필드들 활성화/비활성화"""
+        self.le_archive_path.setEnabled(checked)
+        self.le_archive_max_files.setEnabled(checked)
+        self.cb_archive_time_period.setEnabled(checked)
+        if checked and self.cb_archive_time_period.isChecked():
+            self.le_archive_time_period.setEnabled(True)
+        else:
+            self.le_archive_time_period.setEnabled(False)
+
+        if not checked:
+            self.le_archive_path.clear()
+            self.le_archive_max_files.clear()
+            self.cb_archive_time_period.setChecked(False)
+            self.le_archive_time_period.clear()
+
     def _gather_data_from_ui(self):
         """하드코딩된 UI에서 모든 사용자 입력값을 수집합니다."""
-        data = {'global': {}, 'interfaces': {}, 'vlans': {}, 'routing': {}, 'ha': {}, 'security': {}}
+        # ! --- 수정된 부분 시작 ---
+        data = {'global': {}, 'interfaces': {}, 'vlans': {}, 'switching': {}, 'routing': {}, 'ha': {}, 'security': {}}
 
         # Global Tab
         data['global']['hostname'] = self.le_hostname.text()
+        # ... (기존 Global 설정 수집 코드는 동일)
+        # ! --- (이하 Global, Interface, VLAN 데이터 수집 코드는 기존과 동일하여 생략) ---
+
+        # Global Tab - 기본 설정
+        data['global']['hostname'] = self.le_hostname.text()
         data['global']['service_timestamps'] = self.cb_service_timestamps.isChecked()
         data['global']['service_password_encryption'] = self.cb_service_password_encryption.isChecked()
+        data['global']['service_call_home'] = self.cb_service_call_home.isChecked()
 
-        # [수정된 부분] 빈 리스트로 초기화
+        # DNS & Domain 설정
+        data['global']['domain_name'] = self.le_domain_name.text()
+        dns_servers = []
+        for row in range(self.dns_table.rowCount()):
+            ip_item = self.dns_table.item(row, 0)
+            vrf_item = self.dns_table.item(row, 1)
+            if ip_item and ip_item.text():
+                dns_servers.append({'ip': ip_item.text(), 'vrf': vrf_item.text() if vrf_item else ''})
+        data['global']['dns_servers'] = dns_servers
+
+        # Clock & Timezone 설정
+        timezone = self.combo_timezone.currentText()
+        if timezone == "Custom":
+            data['global']['timezone'] = self.le_custom_timezone.text()
+        else:
+            data['global']['timezone'] = timezone
+
+        # Logging 설정
+        data['global']['logging_level'] = self.combo_logging_level.currentText()
+        data['global']['logging_console'] = self.cb_logging_console.isChecked()
+        data['global']['logging_buffered'] = self.cb_logging_buffered.isChecked()
+        data['global']['logging_buffer_size'] = self.le_logging_buffer_size.text()
+
         log_hosts = []
         for row in range(self.logging_table.rowCount()):
             ip_item = self.logging_table.item(row, 0)
@@ -275,53 +576,143 @@ class MainWindow(QMainWindow):
                 log_hosts.append({'ip': ip_item.text(), 'vrf': vrf_item.text() if vrf_item else ''})
         data['global']['logging_hosts'] = log_hosts
 
-        # [수정된 부분] 빈 리스트로 초기화
+        # NTP 설정
+        data['global']['ntp_authenticate'] = self.cb_ntp_authenticate.isChecked()
+        data['global']['ntp_master_stratum'] = self.le_ntp_master_stratum.text()
+
         ntp_servers = []
         for row in range(self.ntp_table.rowCount()):
             ip_item = self.ntp_table.item(row, 0)
-            prefer_item = self.ntp_table.item(row, 1)  # QCheckBox를 테이블 셀에 넣어야 함
-            vrf_item = self.ntp_table.item(row, 2)
+            prefer_item = self.ntp_table.item(row, 1)
+            key_item = self.ntp_table.item(row, 2)
+            vrf_item = self.ntp_table.item(row, 3)
             if ip_item and ip_item.text():
-                ntp_servers.append({'ip': ip_item.text(), 'prefer': False, 'vrf': vrf_item.text() if vrf_item else ''})
+                ntp_servers.append({
+                    'ip': ip_item.text(),
+                    'prefer': prefer_item.text().lower() == 'true' if prefer_item and prefer_item.text() else False,
+                    'key_id': key_item.text() if key_item else '',
+                    'vrf': vrf_item.text() if vrf_item else ''
+                })
         data['global']['ntp_servers'] = ntp_servers
 
-        # Interface Tab (기본 정보만)
-        data['interfaces']['type'] = self.combo_interface_type.currentText() if hasattr(self,
-                                                                                        'combo_interface_type') else 'Access'
-        data['interfaces']['description'] = self.le_interface_description.text() if hasattr(self,
-                                                                                            'le_interface_description') else ''
+        # Management Interface 설정
+        mgmt_interface = self.combo_mgmt_interface.currentText()
+        if mgmt_interface == "Custom":
+            mgmt_interface = self.le_custom_mgmt_interface.text()
+        elif mgmt_interface == "None":
+            mgmt_interface = ""
+
+        data['global']['management'] = {
+            'interface': mgmt_interface,
+            'ip': self.le_mgmt_ip.text(),
+            'subnet': self.le_mgmt_subnet.text(),
+            'gateway': self.le_mgmt_gateway.text(),
+            'vrf': self.le_mgmt_vrf.text()
+        }
+
+        # Banner 설정
+        data['global']['banner'] = {
+            'enabled': self.cb_enable_banner.isChecked(),
+            'text': self.te_banner_text.toPlainText() if self.cb_enable_banner.isChecked() else ''
+        }
+
+        # Archive 설정
+        data['global']['archive'] = {
+            'enabled': self.cb_archive_config.isChecked(),
+            'path': self.le_archive_path.text() if self.cb_archive_config.isChecked() else '',
+            'max_files': self.le_archive_max_files.text() if self.cb_archive_config.isChecked() else '',
+            'time_period_enabled': self.cb_archive_time_period.isChecked(),
+            'time_period': self.le_archive_time_period.text() if self.cb_archive_time_period.isChecked() else ''
+        }
+
+        # Interface Tab
+        data['interfaces']['type'] = self.combo_interface_type.currentText()
+        data['interfaces']['description'] = self.le_interface_description.text()
 
         # VLAN Tab
         vlans = []
-        if hasattr(self, 'vlan_table'):
-            for row in range(self.vlan_table.rowCount()):
-                vlan_id_item = self.vlan_table.item(row, 0)
-                vlan_name_item = self.vlan_table.item(row, 1)
-                vlan_desc_item = self.vlan_table.item(row, 2)
-                if vlan_id_item and vlan_id_item.text():
-                    vlans.append({
-                        'id': vlan_id_item.text(),
-                        'name': vlan_name_item.text() if vlan_name_item else '',
-                        'description': vlan_desc_item.text() if vlan_desc_item else ''
-                    })
+        for row in range(self.vlan_table.rowCount()):
+            vlan_id_item = self.vlan_table.item(row, 0)
+            vlan_name_item = self.vlan_table.item(row, 1)
+            vlan_desc_item = self.vlan_table.item(row, 2)
+            if vlan_id_item and vlan_id_item.text():
+                vlans.append({
+                    'id': vlan_id_item.text(),
+                    'name': vlan_name_item.text() if vlan_name_item else '',
+                    'description': vlan_desc_item.text() if vlan_desc_item else ''
+                })
         data['vlans']['list'] = vlans
 
+        # ! --- 추가된 부분 시작 ---
+        # Switching Tab
+        data['switching']['stp_mode'] = self.combo_stp_mode.currentText()
+        data['switching']['stp_portfast_default'] = self.cb_stp_portfast_default.isChecked()
+        data['switching']['stp_bpduguard_default'] = self.cb_stp_bpduguard_default.isChecked()
+
         # Security Tab
-        data['security']['aaa_new_model'] = self.cb_aaa_new_model.isChecked()
+        sec = data['security']
+        sec['aaa_new_model'] = self.cb_aaa_new_model.isChecked()
+        sec['aaa_auth_login'] = self.le_aaa_auth_login.text()
+        sec['aaa_auth_exec'] = self.le_aaa_auth_exec.text()
 
         # AAA 서버 그룹
-        aaa_groups = []
+        sec['aaa_groups'] = []
         for row in range(self.aaa_server_table.rowCount()):
             type_item = self.aaa_server_table.item(row, 0)
             group_item = self.aaa_server_table.item(row, 1)
             servers_item = self.aaa_server_table.item(row, 2)
             if type_item and group_item and servers_item:
-                aaa_groups.append({
+                sec['aaa_groups'].append({
                     'type': type_item.text(),
                     'group_name': group_item.text(),
                     'servers': [s.strip() for s in servers_item.text().split(',') if s.strip()]
                 })
-        data['security']['aaa_groups'] = aaa_groups
+
+        # Local Users
+        sec['local_users'] = []
+        for row in range(self.users_table.rowCount()):
+            user_item = self.users_table.item(row, 0)
+            priv_item = self.users_table.item(row, 1)
+            pass_item = self.users_table.item(row, 2)
+            if user_item and user_item.text():
+                sec['local_users'].append({
+                    'username': user_item.text(),
+                    'privilege': priv_item.text() if priv_item else '1',
+                    'password': pass_item.text() if pass_item else ''
+                })
+
+        # Line Config
+        sec['line_config'] = {
+            'con_timeout': self.le_con_exec_timeout.text(),
+            'con_logging_sync': self.cb_con_logging_sync.isChecked(),
+            'vty_timeout': self.le_vty_exec_timeout.text(),
+            'vty_transport': self.combo_vty_transport.currentText()
+        }
+
+        # SNMP
+        sec['snmp'] = {
+            'location': self.le_snmp_location.text(),
+            'contact': self.le_snmp_contact.text(),
+            'communities': []
+        }
+        for row in range(self.snmp_community_table.rowCount()):
+            comm_item = self.snmp_community_table.item(row, 0)
+            perm_item = self.snmp_community_table.item(row, 1)
+            acl_item = self.snmp_community_table.item(row, 2)
+            if comm_item and comm_item.text():
+                sec['snmp']['communities'].append({
+                    'community': comm_item.text(),
+                    'permission': perm_item.text() if perm_item else 'RO',
+                    'acl': acl_item.text() if acl_item else ''
+                })
+
+        # Security Hardening
+        sec['hardening'] = {
+            'no_ip_http': self.cb_no_ip_http.isChecked(),
+            'no_cdp': self.cb_no_cdp.isChecked(),
+            'lldp': self.cb_lldp.isChecked()
+        }
+        # ! --- 추가된 부분 끝 ---
 
         return data
 
