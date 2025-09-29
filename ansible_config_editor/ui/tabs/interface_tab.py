@@ -1,0 +1,153 @@
+# ansible_config_editor/ui/tabs/interface_tab.py
+from PySide6.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, QListWidget, QPushButton,
+                               QScrollArea, QGroupBox, QFormLayout, QLabel, QCheckBox,
+                               QLineEdit, QComboBox, QStackedWidget, QAbstractItemView)
+
+
+class InterfaceTab(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._setup_ui()
+
+    def _setup_ui(self):
+        main_layout = QHBoxLayout(self)
+
+        # Left Panel (Interface List)
+        left_widget = QWidget()
+        left_layout = QVBoxLayout(left_widget)
+        left_layout.addWidget(QLabel("설정할 인터페이스 목록 (Ctrl, Shift로 다중 선택 가능)"))
+        self.interface_list = QListWidget()
+        self.interface_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        left_layout.addWidget(self.interface_list)
+        warning_label = QLabel("주의: 물리적 구성이 동일한\n장비 그룹별로 작업하십시오.")
+        warning_label.setStyleSheet("color: red; font-weight: bold;")
+        left_layout.addWidget(warning_label)
+        btn_layout = QHBoxLayout()
+        self.btn_add_interface = QPushButton("인터페이스 추가")
+        self.btn_add_port_channel = QPushButton("Port-Channel 추가")
+        self.btn_remove_interface = QPushButton("목록에서 삭제")
+        btn_layout.addWidget(self.btn_add_interface)
+        btn_layout.addWidget(self.btn_add_port_channel)
+        left_layout.addLayout(btn_layout)
+        left_layout.addWidget(self.btn_remove_interface)
+        main_layout.addWidget(left_widget, 2)
+
+        # Right Panel (Configuration Area)
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        right_widget = QWidget()
+        config_layout = QVBoxLayout(right_widget)
+        scroll_area.setWidget(right_widget)
+        main_layout.addWidget(scroll_area, 5)
+
+        self.config_area_widget = QWidget()
+        config_layout.addWidget(self.config_area_widget)
+        form_layout = QVBoxLayout(self.config_area_widget)
+
+        # Basic Settings
+        group_basic = QGroupBox("기본 설정")
+        form_basic = QFormLayout()
+        self.if_label = QLabel("왼쪽 목록에서 인터페이스를 선택하세요.")
+        self.cb_if_shutdown = QCheckBox("Shutdown")
+        self.le_if_description = QLineEdit()
+        self.combo_if_type = QComboBox()
+        self.combo_if_type.addItems(["Copper", "Fiber"])
+        self.combo_if_mode = QComboBox()
+        self.combo_if_mode.addItems(["L2 Access", "L2 Trunk", "L3 Routed", "Port-Channel Member"])
+        form_basic.addRow(self.if_label)
+        form_basic.addRow("상태:", self.cb_if_shutdown)
+        form_basic.addRow("설명:", self.le_if_description)
+        form_basic.addRow("포트 유형:", self.combo_if_type)
+        form_basic.addRow("인터페이스 모드:", self.combo_if_mode)
+        group_basic.setLayout(form_basic)
+        form_layout.addWidget(group_basic)
+
+        # Mode Specific Settings (Stacked Widget)
+        self.mode_stack = QStackedWidget()
+        form_layout.addWidget(self.mode_stack)
+
+        # Stack 0: L2 Access
+        stack_access = QWidget()
+        form_access = QFormLayout(stack_access)
+        self.le_access_vlan = QLineEdit()
+        self.le_voice_vlan = QLineEdit()
+        form_access.addRow("Access VLAN:", self.le_access_vlan)
+        form_access.addRow("Voice VLAN:", self.le_voice_vlan)
+        self.mode_stack.addWidget(stack_access)
+
+        # Stack 1: L2 Trunk
+        stack_trunk = QWidget()
+        form_trunk = QFormLayout(stack_trunk)
+        self.le_trunk_native = QLineEdit()
+        self.le_trunk_allowed = QLineEdit()
+        form_trunk.addRow("Native VLAN:", self.le_trunk_native)
+        form_trunk.addRow("Allowed VLANs:", self.le_trunk_allowed)
+        self.mode_stack.addWidget(stack_trunk)
+
+        # Stack 2: L3 Routed
+        stack_routed = QWidget()
+        form_routed = QFormLayout(stack_routed)
+        self.le_routed_ip = QLineEdit()
+        form_routed.addRow("IP 주소/Prefix:", self.le_routed_ip)
+        self.combo_routed_acl_in = QComboBox()
+        self.combo_routed_acl_out = QComboBox()
+        form_routed.addRow("IP Access-Group IN:", self.combo_routed_acl_in)
+        form_routed.addRow("IP Access-Group OUT:", self.combo_routed_acl_out)
+        self.mode_stack.addWidget(stack_routed)
+
+        # Stack 3: Port-Channel Member
+        stack_pc_member = QWidget()
+        form_pc_member = QFormLayout(stack_pc_member)
+        self.le_channel_group_id = QLineEdit()
+        self.combo_channel_group_mode = QComboBox()
+        self.combo_channel_group_mode.addItems(["active", "passive", "on"])
+        form_pc_member.addRow("Channel-Group ID:", self.le_channel_group_id)
+        form_pc_member.addRow("LACP 모드:", self.combo_channel_group_mode)
+        self.mode_stack.addWidget(stack_pc_member)
+
+        # Other Feature Groups
+        self.group_if_stp = QGroupBox("Spanning Tree")
+        form_stp = QFormLayout(self.group_if_stp)
+        self.cb_stp_portfast = QCheckBox("Portfast 활성화 (Edge port)")
+        self.cb_stp_bpduguard = QCheckBox("BPDU Guard 활성화")
+        form_stp.addRow(self.cb_stp_portfast)
+        form_stp.addRow(self.cb_stp_bpduguard)
+        form_layout.addWidget(self.group_if_stp)
+
+        self.group_if_port_security = QGroupBox("Port Security")
+        form_ps = QFormLayout(self.group_if_port_security)
+        self.cb_ps_enabled = QCheckBox("Port Security 활성화")
+        self.le_ps_max_mac = QLineEdit("1")
+        self.combo_ps_violation = QComboBox()
+        self.combo_ps_violation.addItems(["shutdown", "restrict", "protect"])
+        form_ps.addRow(self.cb_ps_enabled)
+        form_ps.addRow("최대 MAC 주소 수:", self.le_ps_max_mac)
+        form_ps.addRow("Violation 모드:", self.combo_ps_violation)
+        form_layout.addWidget(self.group_if_port_security)
+
+        self.group_if_storm_control = QGroupBox("Storm Control")
+        form_sc = QFormLayout(self.group_if_storm_control)
+        self.le_sc_broadcast = QLineEdit("10.00")
+        self.le_sc_multicast = QLineEdit()
+        self.le_sc_unicast = QLineEdit()
+        self.combo_sc_action = QComboBox()
+        self.combo_sc_action.addItems(["shutdown", "trap"])
+        form_sc.addRow("Broadcast Level (%):", self.le_sc_broadcast)
+        form_sc.addRow("Multicast Level (%):", self.le_sc_multicast)
+        form_sc.addRow("Unicast Level (%):", self.le_sc_unicast)
+        form_sc.addRow("Action:", self.combo_sc_action)
+        form_layout.addWidget(self.group_if_storm_control)
+
+        self.group_if_udld = QGroupBox("UDLD")
+        form_udld = QFormLayout(self.group_if_udld)
+        self.cb_udld_enabled = QCheckBox("UDLD 활성화")
+        self.combo_udld_mode = QComboBox()
+        self.combo_udld_mode.addItems(["normal", "aggressive"])
+        self.combo_udld_mode.setEnabled(False)
+        self.cb_udld_enabled.toggled.connect(self.combo_udld_mode.setEnabled)
+        form_udld.addRow(self.cb_udld_enabled)
+        form_udld.addRow("모드:", self.combo_udld_mode)
+        form_layout.addWidget(self.group_if_udld)
+
+        config_layout.addStretch()
+        self.config_area_widget.setVisible(False)
