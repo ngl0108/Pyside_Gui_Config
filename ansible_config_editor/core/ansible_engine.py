@@ -5,7 +5,6 @@ from typing import Dict, List, Any, Tuple
 from datetime import datetime
 
 
-
 class AnsibleEngine:
     """
     Windows 환경에서의 개발 편의성을 위한 Mock Ansible 실행 엔진
@@ -23,18 +22,32 @@ class AnsibleEngine:
         bool, Dict[str, Any]]:
         """
         특정 장비에 접속하여 facts 정보를 수집합니다.
-
-        Args:
-            target_host: 정보를 수집할 장비의 IP
-            os_type: 장비 OS 유형 (플레이북의 when 조건에 사용)
-            credentials: {'user': 'myuser', 'pass': 'mypass'} 형태의 인증 정보
-
-        Returns:
-            (성공 여부, 수집된 ansible_facts 사전 또는 에러 메시지)
+        'test-sw' 호스트에 대해서는 Mock 데이터를 반환하여 테스트를 지원합니다.
         """
-        import ansible_runner
-        import tempfile
-        import os
+        # === 테스트를 위한 수정 시작 ===
+        if target_host == "test-sw":
+            print("--- [Test Mode] Mock facts 데이터를 반환합니다. ---")
+            mock_facts = {
+                "ansible_net_model": "C9300-24UX (Test Model)",
+                "ansible_net_version": "17.03.05 (Test Version)",
+                "ansible_net_interfaces": {
+                    "GigabitEthernet1/0/1": {"description": "Uplink to Core", "macaddress": "00:00:0c:07:ac:01"},
+                    "GigabitEthernet1/0/2": {"description": "Server Connection", "macaddress": "00:00:0c:07:ac:02"},
+                    "GigabitEthernet1/0/3": {"description": "", "macaddress": "00:00:0c:07:ac:03"},
+                    "TenGigabitEthernet1/1/1": {"description": "Fiber Uplink", "macaddress": "00:00:0c:07:ac:f1"},
+                }
+            }
+            return True, mock_facts
+        # === 테스트를 위한 수정 끝 ===
+
+        # 아래는 기존의 실제 ansible-runner 실행 로직입니다.
+        try:
+            import ansible_runner
+            import tempfile
+            import os
+        except ImportError:
+            return False, {"error": "ansible-runner를 찾을 수 없습니다. 'pip install ansible-runner'로 설치해주세요."}
+
         # OS 유형에서 L2/L3 부분을 제거하여 순수 OS 이름만 사용 (예: L2_IOS-XE -> IOS-XE)
         clean_os_type = os_type.split('_')[-1]
 
