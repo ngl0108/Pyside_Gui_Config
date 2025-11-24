@@ -1,29 +1,31 @@
 # cisco_config_manager/ui/main_window.py
 from PySide6.QtWidgets import (
-    QMainWindow, QTabWidget, QMenuBar, QMenu, 
+    QMainWindow, QTabWidget, QMenuBar, QMenu,
     QToolBar, QStatusBar, QFileDialog, QMessageBox,
     QVBoxLayout, QWidget, QTextEdit, QSplitter,
     QDockWidget, QTreeWidget, QTreeWidgetItem, QPlainTextEdit,
     QInputDialog, QListWidget, QListWidgetItem, QTableWidgetItem,
-    QDialog, QComboBox, QPushButton, QHBoxLayout, QLabel, QAction,
-    QUndoStack, QUndoCommand
+    QDialog, QComboBox, QPushButton, QHBoxLayout, QLabel,
+    QUndoStack, QUndoCommand, QLineEdit, QCheckBox, QSpinBox,
+    QGroupBox, QFormLayout, QDialogButtonBox
 )
 from PySide6.QtCore import Qt, QTimer, Signal, QSettings
 from PySide6.QtGui import QAction, QKeySequence, QIcon, QTextCharFormat, QColor, QFont
 
 # 탭 모듈들
-from tabs.interface_tab import InterfaceTab
-from tabs.vlan_tab import VlanTab
-from tabs.routing_tab import RoutingTab
-from tabs.switching_tab import SwitchingTab
-from tabs.security_tab import SecurityTab
-from tabs.acl_tab import AclTab
-from tabs.global_tab import GlobalTab
-from tabs.ha_tab import HaTab
+from .tabs.interface_tab import InterfaceTab
+from .tabs.vlan_tab import VlanTab
+from .tabs.routing_tab import RoutingTab
+from .tabs.switching_tab import SwitchingTab
+from .tabs.security_tab import SecurityTab
+from .tabs.acl_tab import AclTab
+from .tabs.global_tab import GlobalTab
+from .tabs.ha_tab import HaTab
 
 # Core 모듈들 - 상대 경로로 수정
 import sys
 import os
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.command_generator import CiscoCommandGenerator
@@ -48,16 +50,16 @@ from typing import Dict, List, Any, Optional
 
 class ConfigCommand(QUndoCommand):
     """구성 변경을 위한 Undo/Redo 명령"""
-    
+
     def __init__(self, widget, old_value, new_value, description):
         super().__init__(description)
         self.widget = widget
         self.old_value = old_value
         self.new_value = new_value
-        
+
     def undo(self):
         self.widget.setText(self.old_value)
-        
+
     def redo(self):
         self.widget.setText(self.new_value)
 
@@ -65,7 +67,7 @@ class ConfigCommand(QUndoCommand):
 class MainWindow(QMainWindow):
     # 시그널 정의
     config_changed = Signal()
-    
+
     def __init__(self):
         super().__init__()
         self.current_file_path = None
@@ -74,17 +76,17 @@ class MainWindow(QMainWindow):
         self.cli_analyzer = CLIAnalyzer()
         self.original_config = {}
         self.template_manager = ConfigTemplate()
-        
+
         # Undo/Redo 스택
         self.undo_stack = QUndoStack(self)
-        
+
         # 설정 관리
         self.settings = QSettings("CiscoTools", "ConfigManager")
-        
+
         # 최근 파일 목록
         self.recent_files = []
         self.max_recent_files = 5
-        
+
         self._setup_ui()
         self._connect_signals()
         self._connect_tab_signals()
@@ -103,7 +105,7 @@ class MainWindow(QMainWindow):
         # 좌측 패널 (구성 트리)
         left_panel = QWidget()
         left_layout = QVBoxLayout(left_panel)
-        
+
         # 검색 필드
         search_layout = QHBoxLayout()
         self.search_field = QLineEdit()
@@ -112,24 +114,24 @@ class MainWindow(QMainWindow):
         search_layout.addWidget(self.search_field)
         search_layout.addWidget(search_button)
         left_layout.addLayout(search_layout)
-        
+
         # 구성 트리
         self.config_tree = QTreeWidget()
         self.config_tree.setHeaderLabel("구성 요소")
         left_layout.addWidget(self.config_tree)
-        
+
         # 템플릿 목록
         self.template_list = QListWidget()
         self._load_template_list()
         left_layout.addWidget(QLabel("템플릿:"))
         left_layout.addWidget(self.template_list)
-        
+
         main_splitter.addWidget(left_panel)
 
         # 중앙 패널 (탭)
         central_panel = QWidget()
         central_layout = QVBoxLayout(central_panel)
-        
+
         # 메인 탭 위젯
         self.tab_widget = QTabWidget()
         central_layout.addWidget(self.tab_widget)
@@ -158,22 +160,22 @@ class MainWindow(QMainWindow):
         # 우측 패널 (명령어 미리보기)
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
-        
+
         right_layout.addWidget(QLabel("명령어 미리보기:"))
         self.command_preview = QPlainTextEdit()
         self.command_preview.setReadOnly(True)
         self.command_preview.setPlaceholderText("생성된 명령어가 여기에 표시됩니다...")
         right_layout.addWidget(self.command_preview)
-        
+
         # 검증 결과
         right_layout.addWidget(QLabel("검증 결과:"))
         self.validation_output = QPlainTextEdit()
         self.validation_output.setReadOnly(True)
         self.validation_output.setMaximumHeight(150)
         right_layout.addWidget(self.validation_output)
-        
+
         main_splitter.addWidget(right_panel)
-        
+
         # 분할 비율 설정
         main_splitter.setSizes([250, 900, 250])
 
@@ -218,7 +220,7 @@ class MainWindow(QMainWindow):
         # 최근 파일 메뉴
         self.recent_files_menu = file_menu.addMenu("최근 파일")
         self._update_recent_files_menu()
-        
+
         file_menu.addSeparator()
 
         import_action = QAction("CLI 구성 가져오기", self)
@@ -240,26 +242,26 @@ class MainWindow(QMainWindow):
 
         # 편집 메뉴
         edit_menu = menubar.addMenu("편집")
-        
+
         undo_action = QAction("실행 취소", self)
         undo_action.setShortcut(QKeySequence.Undo)
         undo_action.triggered.connect(self.undo_stack.undo)
         edit_menu.addAction(undo_action)
-        
+
         redo_action = QAction("다시 실행", self)
         redo_action.setShortcut(QKeySequence.Redo)
         redo_action.triggered.connect(self.undo_stack.redo)
         edit_menu.addAction(redo_action)
-        
+
         edit_menu.addSeparator()
-        
+
         find_action = QAction("찾기", self)
         find_action.setShortcut(QKeySequence.Find)
         find_action.triggered.connect(self._show_find_dialog)
         edit_menu.addAction(find_action)
-        
+
         edit_menu.addSeparator()
-        
+
         compare_action = QAction("구성 비교", self)
         compare_action.setShortcut("Ctrl+D")
         compare_action.triggered.connect(self._compare_configs)
@@ -277,48 +279,61 @@ class MainWindow(QMainWindow):
         analyze_action.setShortcut("F6")
         analyze_action.triggered.connect(self._analyze_config)
         tools_menu.addAction(analyze_action)
-        
+
         validate_action = QAction("구성 검증", self)
         validate_action.setShortcut("F7")
         validate_action.triggered.connect(self._validate_config)
         tools_menu.addAction(validate_action)
-        
+
         tools_menu.addSeparator()
-        
+
         # 장비 연결 관리 추가
         device_manager_action = QAction("장비 연결 관리", self)
         device_manager_action.setShortcut("F8")
         device_manager_action.triggered.connect(self._open_device_manager)
         tools_menu.addAction(device_manager_action)
-        
+
         deploy_action = QAction("현재 구성 배포", self)
         deploy_action.setShortcut("F9")
         deploy_action.triggered.connect(self._deploy_current_config)
         tools_menu.addAction(deploy_action)
-        
+
         tools_menu.addSeparator()
-        
+
+        # 시각화 및 모니터링 추가
+        topology_action = QAction("네트워크 토폴로지", self)
+        topology_action.setShortcut("F10")
+        topology_action.triggered.connect(self._open_topology_viewer)
+        tools_menu.addAction(topology_action)
+
+        dashboard_action = QAction("실시간 대시보드", self)
+        dashboard_action.setShortcut("F11")
+        dashboard_action.triggered.connect(self._open_dashboard)
+        tools_menu.addAction(dashboard_action)
+
+        tools_menu.addSeparator()
+
         template_action = QAction("템플릿 관리", self)
         template_action.triggered.connect(self._manage_templates)
         tools_menu.addAction(template_action)
 
         # 보기 메뉴
         view_menu = menubar.addMenu("보기")
-        
+
         tree_action = QAction("구성 트리", self)
         tree_action.setCheckable(True)
         tree_action.setChecked(True)
         tree_action.triggered.connect(self._toggle_config_tree)
         view_menu.addAction(tree_action)
-        
+
         preview_action = QAction("명령어 미리보기", self)
         preview_action.setCheckable(True)
         preview_action.setChecked(True)
         preview_action.triggered.connect(self._toggle_preview)
         view_menu.addAction(preview_action)
-        
+
         view_menu.addSeparator()
-        
+
         refresh_action = QAction("새로고침", self)
         refresh_action.setShortcut("F5")
         refresh_action.triggered.connect(self._refresh_view)
@@ -331,7 +346,7 @@ class MainWindow(QMainWindow):
         help_action.setShortcut("F1")
         help_action.triggered.connect(self._show_help)
         help_menu.addAction(help_action)
-        
+
         help_menu.addSeparator()
 
         about_action = QAction("정보", self)
@@ -354,13 +369,13 @@ class MainWindow(QMainWindow):
         save_action.triggered.connect(self._save_config)
 
         toolbar.addSeparator()
-        
+
         undo_action = toolbar.addAction("↶ 실행취소")
         undo_action.triggered.connect(self.undo_stack.undo)
-        
+
         redo_action = toolbar.addAction("↷ 다시실행")
         redo_action.triggered.connect(self.undo_stack.redo)
-        
+
         toolbar.addSeparator()
 
         generate_action = toolbar.addAction("⚙️ 명령어 생성")
@@ -368,35 +383,35 @@ class MainWindow(QMainWindow):
 
         analyze_action = toolbar.addAction("🔍 구성 분석")
         analyze_action.triggered.connect(self._analyze_config)
-        
+
         validate_action = toolbar.addAction("✓ 검증")
         validate_action.triggered.connect(self._validate_config)
-        
+
         toolbar.addSeparator()
-        
+
         template_action = toolbar.addAction("📋 템플릿")
         template_action.triggered.connect(self._manage_templates)
 
     def _setup_statusbar(self):
         """상태바 설정"""
         self.status_bar = self.statusBar()
-        
+
         # 상태 메시지
         self.status_label = QLabel("준비됨")
         self.status_bar.addWidget(self.status_label)
-        
+
         # 수정 상태
         self.modified_label = QLabel("")
         self.status_bar.addPermanentWidget(self.modified_label)
-        
+
         # 파일 경로
         self.file_label = QLabel("새 파일")
         self.status_bar.addPermanentWidget(self.file_label)
-        
+
         # 현재 시간
         self.time_label = QLabel("")
         self.status_bar.addPermanentWidget(self.time_label)
-        
+
         # 시간 업데이트 타이머
         self.timer = QTimer()
         self.timer.timeout.connect(self._update_time)
@@ -406,13 +421,13 @@ class MainWindow(QMainWindow):
         """시그널 연결"""
         # 탭 변경 시
         self.tab_widget.currentChanged.connect(self._on_tab_changed)
-        
+
         # 템플릿 선택 시
         self.template_list.itemDoubleClicked.connect(self._apply_template)
-        
+
         # 검색
         self.search_field.returnPressed.connect(self._search_config)
-        
+
         # 구성 변경 시
         self.config_changed.connect(self._on_config_changed)
 
@@ -423,24 +438,24 @@ class MainWindow(QMainWindow):
             self.interface_tab.btn_add_interface.clicked.connect(self._add_interface)
             self.interface_tab.btn_remove_interface.clicked.connect(self._remove_interface)
             self.interface_tab.interface_list.itemSelectionChanged.connect(self._on_interface_selected)
-        
+
         # VLAN 탭 시그널 연결
         if hasattr(self.vlan_tab, 'btn_add_vlan'):
             self.vlan_tab.btn_add_vlan.clicked.connect(self._add_vlan)
             self.vlan_tab.btn_remove_vlan.clicked.connect(self._remove_vlan)
-        
+
         # ACL 탭 시그널 연결
         if hasattr(self.acl_tab, 'btn_add_acl'):
             self.acl_tab.btn_add_acl.clicked.connect(self._add_acl)
             self.acl_tab.btn_remove_acl.clicked.connect(self._remove_acl)
             self.acl_tab.btn_add_rule.clicked.connect(self._add_ace)
             self.acl_tab.btn_remove_rule.clicked.connect(self._remove_ace)
-        
+
         # 라우팅 탭 시그널 연결
         if hasattr(self.routing_tab, 'btn_add_static_route'):
             self.routing_tab.btn_add_static_route.clicked.connect(self._add_static_route)
             self.routing_tab.btn_remove_static_route.clicked.connect(self._remove_static_route)
-        
+
         # Global 탭 시그널 연결
         if hasattr(self.global_tab, 'btn_add_dns'):
             self.global_tab.btn_add_dns.clicked.connect(self._add_dns_server)
@@ -527,7 +542,7 @@ class MainWindow(QMainWindow):
         if current_acl_row < 0:
             QMessageBox.warning(self, "경고", "먼저 ACL을 선택하세요.")
             return
-            
+
         acl_type = self.acl_tab.acl_list_table.item(current_acl_row, 1).text()
         dialog = AceDialog(self, acl_type=acl_type)
         if dialog.exec() == QDialog.Accepted:
@@ -626,15 +641,15 @@ class MainWindow(QMainWindow):
     def _open_config(self):
         """구성 파일 열기"""
         file_path, _ = QFileDialog.getOpenFileName(
-            self, "구성 파일 열기", "", 
+            self, "구성 파일 열기", "",
             "JSON Files (*.json);;All Files (*)"
         )
-        
+
         if file_path:
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     config = json.load(f)
-                
+
                 self._load_config_to_ui(config)
                 self.current_file_path = file_path
                 self.original_config = config.copy()
@@ -643,7 +658,7 @@ class MainWindow(QMainWindow):
                 self._update_status(f"파일 열림: {file_path}")
                 self._add_to_recent_files(file_path)
                 self._update_config_tree()
-                
+
             except Exception as e:
                 QMessageBox.critical(self, "오류", f"파일을 열 수 없습니다:\n{str(e)}")
 
@@ -656,12 +671,12 @@ class MainWindow(QMainWindow):
                 config = self._get_current_config()
                 with open(self.current_file_path, 'w', encoding='utf-8') as f:
                     json.dump(config, f, indent=2, ensure_ascii=False)
-                
+
                 self.original_config = config.copy()
                 self.is_modified = False
                 self._update_status(f"저장됨: {self.current_file_path}")
                 self._update_modified_status()
-                
+
             except Exception as e:
                 QMessageBox.critical(self, "오류", f"파일을 저장할 수 없습니다:\n{str(e)}")
 
@@ -671,11 +686,11 @@ class MainWindow(QMainWindow):
             self, "구성 저장", "",
             "JSON Files (*.json);;All Files (*)"
         )
-        
+
         if file_path:
             if not file_path.endswith('.json'):
                 file_path += '.json'
-            
+
             self.current_file_path = file_path
             self._save_config()
             self.setWindowTitle(f"Cisco Config Manager - {os.path.basename(file_path)}")
@@ -686,19 +701,19 @@ class MainWindow(QMainWindow):
             self, "CLI 구성 가져오기", "",
             "Text Files (*.txt);;Config Files (*.cfg);;All Files (*)"
         )
-        
+
         if file_path:
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     cli_content = f.read()
-                
+
                 # CLI 분석
                 config = self.cli_analyzer.analyze_show_run(cli_content)
                 self._load_config_to_ui(config)
                 self.is_modified = True
                 self._update_status(f"CLI 구성 가져옴: {file_path}")
                 self._update_config_tree()
-                
+
             except Exception as e:
                 QMessageBox.critical(self, "오류", f"CLI 구성을 가져올 수 없습니다:\n{str(e)}")
 
@@ -707,20 +722,20 @@ class MainWindow(QMainWindow):
         commands = self._generate_commands(show_only=True)
         if not commands:
             return
-            
+
         file_path, _ = QFileDialog.getSaveFileName(
             self, "명령어 내보내기", "",
             "Text Files (*.txt);;All Files (*)"
         )
-        
+
         if file_path:
             try:
                 with open(file_path, 'w', encoding='utf-8') as f:
                     f.write('\n'.join(commands))
-                
+
                 self._update_status(f"명령어 내보냄: {file_path}")
                 QMessageBox.information(self, "성공", "명령어가 성공적으로 내보내졌습니다.")
-                
+
             except Exception as e:
                 QMessageBox.critical(self, "오류", f"명령어를 내보낼 수 없습니다:\n{str(e)}")
 
@@ -728,32 +743,32 @@ class MainWindow(QMainWindow):
         """명령어 생성"""
         current_config = self._get_current_config()
         commands = self.command_generator.generate_commands(self.original_config, current_config)
-        
+
         # 명령어 미리보기 업데이트
         self.command_preview.setPlainText('\n'.join(commands))
-        
+
         if not show_only:
             QMessageBox.information(self, "명령어 생성", f"{len(commands)}개의 명령어가 생성되었습니다.")
-        
+
         return commands
 
     def _analyze_config(self):
         """구성 분석"""
         config = self._get_current_config()
-        
+
         # 분석 결과 다이얼로그 표시
         dialog = QDialog(self)
         dialog.setWindowTitle("구성 분석 결과")
         dialog.setMinimumSize(600, 400)
-        
+
         layout = QVBoxLayout(dialog)
         text_edit = QTextEdit()
         text_edit.setReadOnly(True)
-        
+
         # 분석 내용 생성
         analysis_text = self._generate_analysis_report(config)
         text_edit.setPlainText(analysis_text)
-        
+
         layout.addWidget(text_edit)
         dialog.exec()
 
@@ -761,18 +776,19 @@ class MainWindow(QMainWindow):
         """구성 검증"""
         config = self._get_current_config()
         validation_results = []
-        
+
         # 각 설정 검증
         # IP 주소 검증
         for interface in config.get('interfaces', []):
             if interface.get('routed', {}).get('ip'):
-                ip = interface['routed']['ip'].split()[0] if ' ' in interface['routed']['ip'] else interface['routed']['ip']
+                ip = interface['routed']['ip'].split()[0] if ' ' in interface['routed']['ip'] else interface['routed'][
+                    'ip']
                 valid, msg = NetworkValidator.validate_ip_address(ip)
                 if not valid:
                     validation_results.append(f"❌ 인터페이스 {interface['name']}: {msg}")
                 else:
                     validation_results.append(f"✅ 인터페이스 {interface['name']}: 유효한 IP")
-        
+
         # VLAN ID 검증
         for vlan in config.get('vlans', {}).get('list', []):
             valid, msg = VlanValidator.validate_vlan_id(vlan['id'])
@@ -780,10 +796,10 @@ class MainWindow(QMainWindow):
                 validation_results.append(f"❌ VLAN {vlan['id']}: {msg}")
             else:
                 validation_results.append(f"✅ VLAN {vlan['id']}: 유효함")
-        
+
         # 검증 결과 표시
         self.validation_output.setPlainText('\n'.join(validation_results))
-        
+
         if not validation_results:
             self.validation_output.setPlainText("모든 구성이 유효합니다.")
 
@@ -792,21 +808,21 @@ class MainWindow(QMainWindow):
         if not self.original_config:
             QMessageBox.information(self, "정보", "비교할 원본 구성이 없습니다.")
             return
-            
+
         current_config = self._get_current_config()
         changes = ConfigDiff.compare_configs(self.original_config, current_config)
         report = ConfigDiff.generate_change_report(changes)
-        
+
         # 비교 결과 다이얼로그
         dialog = QDialog(self)
         dialog.setWindowTitle("구성 비교 결과")
         dialog.setMinimumSize(700, 500)
-        
+
         layout = QVBoxLayout(dialog)
         text_edit = QTextEdit()
         text_edit.setReadOnly(True)
         text_edit.setPlainText(report)
-        
+
         layout.addWidget(text_edit)
         dialog.exec()
 
@@ -815,57 +831,58 @@ class MainWindow(QMainWindow):
         dialog = QDialog(self)
         dialog.setWindowTitle("템플릿 관리")
         dialog.setMinimumSize(800, 600)
-        
+
         layout = QVBoxLayout(dialog)
-        
+
         # 템플릿 선택
         template_combo = QComboBox()
         builtin_templates = BuiltInTemplates.list_builtin_templates()
         for template in builtin_templates:
             template_combo.addItem(f"[내장] {template['description']}", template['name'])
-        
+
         for name in self.template_manager.templates:
             template_combo.addItem(f"[사용자] {name}", name)
-        
+
         layout.addWidget(QLabel("템플릿 선택:"))
         layout.addWidget(template_combo)
-        
+
         # 변수 입력 영역
         variables_text = QTextEdit()
-        variables_text.setPlaceholderText("변수를 JSON 형식으로 입력하세요.\n예:\n{\n  \"hostname\": \"SW1\",\n  \"domain\": \"example.com\"\n}")
+        variables_text.setPlaceholderText(
+            "변수를 JSON 형식으로 입력하세요.\n예:\n{\n  \"hostname\": \"SW1\",\n  \"domain\": \"example.com\"\n}")
         layout.addWidget(QLabel("템플릿 변수:"))
         layout.addWidget(variables_text)
-        
+
         # 버튼
         button_layout = QHBoxLayout()
         apply_button = QPushButton("적용")
         save_button = QPushButton("현재 구성을 템플릿으로 저장")
         close_button = QPushButton("닫기")
-        
+
         button_layout.addWidget(apply_button)
         button_layout.addWidget(save_button)
         button_layout.addWidget(close_button)
         layout.addLayout(button_layout)
-        
+
         # 시그널 연결
         def apply_template():
             template_name = template_combo.currentData()
             try:
                 variables = json.loads(variables_text.toPlainText()) if variables_text.toPlainText() else {}
-                
+
                 # 내장 템플릿인지 확인
                 if template_combo.currentText().startswith("[내장]"):
                     config = BuiltInTemplates.get_builtin_template(template_name)
                 else:
                     config = self.template_manager.apply_template(template_name, variables)
-                
+
                 if config:
                     self._load_config_to_ui(config)
                     self._mark_modified()
                     dialog.accept()
             except json.JSONDecodeError:
                 QMessageBox.warning(dialog, "오류", "올바른 JSON 형식이 아닙니다.")
-        
+
         def save_as_template():
             name, ok = QInputDialog.getText(dialog, "템플릿 저장", "템플릿 이름:")
             if ok and name:
@@ -875,11 +892,11 @@ class MainWindow(QMainWindow):
                     if self.template_manager.save_template(name, config, desc):
                         QMessageBox.information(dialog, "성공", "템플릿이 저장되었습니다.")
                         self._load_template_list()
-        
+
         apply_button.clicked.connect(apply_template)
         save_button.clicked.connect(save_as_template)
         close_button.clicked.connect(dialog.reject)
-        
+
         dialog.exec()
 
     def _apply_template(self, item):
@@ -904,7 +921,7 @@ class MainWindow(QMainWindow):
         search_term = self.search_field.text().lower()
         if not search_term:
             return
-            
+
         # 현재 탭에서 검색
         # 구현 필요
 
@@ -912,7 +929,7 @@ class MainWindow(QMainWindow):
         """도움말 표시"""
         help_text = """
         Cisco Config Manager 도움말
-        
+
         단축키:
         - Ctrl+N: 새 구성
         - Ctrl+O: 열기
@@ -924,24 +941,42 @@ class MainWindow(QMainWindow):
         - F7: 구성 검증
         - F8: 장비 연결 관리
         - F9: 구성 배포
-        
+        - F10: 네트워크 토폴로지
+        - F11: 실시간 대시보드
+
         사용 방법:
         1. 각 탭에서 네트워크 구성 요소를 설정합니다.
         2. '명령어 생성'을 클릭하여 Cisco 명령어를 생성합니다.
         3. '장비 연결 관리'에서 실제 장비에 연결합니다.
         4. '구성 배포'로 생성된 명령어를 장비에 적용합니다.
+        5. '네트워크 토폴로지'로 네트워크 구조를 시각화합니다.
+        6. '실시간 대시보드'로 네트워크 상태를 모니터링합니다.
         """
-        
+
         QMessageBox.information(self, "도움말", help_text)
-    
+
+    def _open_topology_viewer(self):
+        """네트워크 토폴로지 뷰어 열기"""
+        from topology_dialog import TopologyDialog
+
+        topology_dialog = TopologyDialog(self)
+        topology_dialog.exec()
+
+    def _open_dashboard(self):
+        """실시간 대시보드 열기"""
+        from dashboard_widget import DashboardDialog
+
+        dashboard_dialog = DashboardDialog(self)
+        dashboard_dialog.show()  # 모달리스로 표시
+
     def _open_device_manager(self):
         """장비 관리 다이얼로그 열기"""
         from device_manager_dialog import DeviceManagerDialog
-        
+
         self.device_manager = DeviceManagerDialog(self)
         self.device_manager.config_deployed.connect(self._on_config_deployed)
         self.device_manager.exec()
-        
+
     def _deploy_current_config(self):
         """현재 구성을 장비에 배포"""
         # 현재 구성에서 명령어 생성
@@ -949,22 +984,22 @@ class MainWindow(QMainWindow):
         if not commands:
             QMessageBox.warning(self, "경고", "생성된 명령어가 없습니다.")
             return
-            
+
         # 장비 관리자 열기
         from device_manager_dialog import DeviceManagerDialog
-        
+
         self.device_manager = DeviceManagerDialog(self)
-        
+
         # 배포 탭으로 이동하고 명령어 설정
         self.device_manager.tab_widget.setCurrentIndex(2)  # 배포 탭
         self.device_manager.deployment_commands.setPlainText('\n'.join(commands))
-        
+
         self.device_manager.exec()
-        
+
     def _on_config_deployed(self, device_name: str, commands: List[str]):
         """구성 배포 완료 처리"""
         self._update_status(f"구성이 {device_name}에 배포되었습니다.")
-        
+
         # 배포 로그 저장 (옵션)
         log_entry = {
             'timestamp': datetime.now().isoformat(),
@@ -977,12 +1012,12 @@ class MainWindow(QMainWindow):
         """프로그램 정보 표시"""
         about_text = """
         Cisco Config Manager v1.0
-        
+
         Cisco 네트워크 장비 구성 관리 도구
-        
+
         © 2024 Network Tools
         """
-        
+
         QMessageBox.about(self, "정보", about_text)
 
     def _on_tab_changed(self, index):
@@ -1037,42 +1072,42 @@ class MainWindow(QMainWindow):
     def _update_config_tree(self):
         """구성 트리 업데이트"""
         self.config_tree.clear()
-        
+
         config = self._get_current_config()
-        
+
         # 전역 설정
         global_item = QTreeWidgetItem(self.config_tree, ["전역 설정"])
         if config.get('global', {}).get('hostname'):
             QTreeWidgetItem(global_item, [f"호스트명: {config['global']['hostname']}"])
-        
+
         # 인터페이스
         interfaces_item = QTreeWidgetItem(self.config_tree, ["인터페이스"])
         for interface in config.get('interfaces', []):
             QTreeWidgetItem(interfaces_item, [interface.get('name', 'Unknown')])
-        
+
         # VLAN
         vlans_item = QTreeWidgetItem(self.config_tree, ["VLAN"])
         for vlan in config.get('vlans', {}).get('list', []):
             QTreeWidgetItem(vlans_item, [f"VLAN {vlan.get('id', '')}: {vlan.get('name', '')}"])
-        
+
         # ACL
         acls_item = QTreeWidgetItem(self.config_tree, ["ACL"])
         for acl in config.get('acls', []):
             QTreeWidgetItem(acls_item, [acl.get('name', 'Unknown')])
-        
+
         self.config_tree.expandAll()
 
     def _load_template_list(self):
         """템플릿 목록 로드"""
         self.template_list.clear()
-        
+
         # 내장 템플릿
         builtin = BuiltInTemplates.list_builtin_templates()
         for template in builtin:
             item = QListWidgetItem(f"[내장] {template['description']}")
             item.setData(Qt.UserRole, template['name'])
             self.template_list.addItem(item)
-        
+
         # 사용자 템플릿
         user_templates = self.template_manager.list_templates()
         for template in user_templates:
@@ -1113,7 +1148,7 @@ class MainWindow(QMainWindow):
                     self._save_config()
                 elif reply == QMessageBox.Cancel:
                     return
-            
+
             # 파일 열기
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
@@ -1166,22 +1201,23 @@ class MainWindow(QMainWindow):
             'acls': [],
             'ha': {}
         }
-        
+
         # Global 탭에서 데이터 수집
         if hasattr(self.global_tab, 'le_hostname'):
             config['global']['hostname'] = self.global_tab.le_hostname.text()
-        
+
         # VLAN 탭에서 데이터 수집
         for row in range(self.vlan_tab.vlan_table.rowCount()):
             vlan = {
                 'id': self.vlan_tab.vlan_table.item(row, 0).text() if self.vlan_tab.vlan_table.item(row, 0) else '',
                 'name': self.vlan_tab.vlan_table.item(row, 1).text() if self.vlan_tab.vlan_table.item(row, 1) else '',
-                'description': self.vlan_tab.vlan_table.item(row, 2).text() if self.vlan_tab.vlan_table.item(row, 2) else ''
+                'description': self.vlan_tab.vlan_table.item(row, 2).text() if self.vlan_tab.vlan_table.item(row,
+                                                                                                             2) else ''
             }
             config['vlans']['list'].append(vlan)
-        
+
         # 다른 탭들도 유사하게 처리
-        
+
         return config
 
     def _load_config_to_ui(self, config: Dict):
@@ -1190,7 +1226,7 @@ class MainWindow(QMainWindow):
         if 'global' in config:
             if hasattr(self.global_tab, 'le_hostname'):
                 self.global_tab.le_hostname.setText(config['global'].get('hostname', ''))
-        
+
         # VLAN 탭 로드
         if 'vlans' in config:
             self.vlan_tab.vlan_table.setRowCount(0)
@@ -1200,7 +1236,7 @@ class MainWindow(QMainWindow):
                 self.vlan_tab.vlan_table.setItem(row, 0, QTableWidgetItem(str(vlan.get('id', ''))))
                 self.vlan_tab.vlan_table.setItem(row, 1, QTableWidgetItem(vlan.get('name', '')))
                 self.vlan_tab.vlan_table.setItem(row, 2, QTableWidgetItem(vlan.get('description', '')))
-        
+
         # 다른 탭들도 유사하게 처리
 
     def _generate_analysis_report(self, config: Dict) -> str:
@@ -1208,13 +1244,13 @@ class MainWindow(QMainWindow):
         report = []
         report.append("=== Cisco 구성 분석 보고서 ===\n")
         report.append(f"생성 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-        
+
         # 기본 정보
         report.append("[기본 정보]")
         report.append(f"호스트명: {config.get('global', {}).get('hostname', 'Not set')}")
         report.append(f"도메인명: {config.get('global', {}).get('domain_name', 'Not set')}")
         report.append("")
-        
+
         # 인터페이스 분석
         interfaces = config.get('interfaces', [])
         report.append(f"[인터페이스 분석]")
@@ -1224,7 +1260,7 @@ class MainWindow(QMainWindow):
             report.append(f"- 활성화: {len(interfaces) - shutdown_count}")
             report.append(f"- 비활성화: {shutdown_count}")
         report.append("")
-        
+
         # VLAN 분석
         vlans = config.get('vlans', {}).get('list', [])
         report.append(f"[VLAN 분석]")
@@ -1233,7 +1269,7 @@ class MainWindow(QMainWindow):
             for vlan in vlans:
                 report.append(f"- VLAN {vlan.get('id', '')}: {vlan.get('name', '')}")
         report.append("")
-        
+
         # 보안 분석
         report.append("[보안 분석]")
         security_config = config.get('security', {})
@@ -1241,12 +1277,12 @@ class MainWindow(QMainWindow):
             report.append("✓ AAA new-model 활성화")
         else:
             report.append("⚠ AAA new-model 비활성화")
-        
+
         if config.get('global', {}).get('service_password_encryption'):
             report.append("✓ 비밀번호 암호화 활성화")
         else:
             report.append("⚠ 비밀번호 암호화 비활성화")
-        
+
         return '\n'.join(report)
 
     def closeEvent(self, event):
