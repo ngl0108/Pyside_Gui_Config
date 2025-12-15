@@ -130,7 +130,7 @@ cisco-config-manager/
 └── core/                 # ✓ 핵심 로직
     ├── __init__.py
     ├── cli_analyzer.py
-    ├── command_generator.py
+    ├── device_manager.py
     ├── config_diff.py
     ├── connection_manager.py
     ├── templates.py

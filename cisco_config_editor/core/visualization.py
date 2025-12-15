@@ -1,4 +1,4 @@
-# cisco_config_manager/core/network_visualizer.py
+# cisco_config_manager/core/visualization.py
 """
 네트워크 토폴로지 시각화 모듈
 실시간 네트워크 구조를 그래픽으로 표현

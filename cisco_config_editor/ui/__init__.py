@@ -3,7 +3,7 @@
 구성 탭 모듈 패키지
 """
 
-from .tabs.interface import InterfaceTab
+from .tabs.interface_tab import InterfaceTab
 from .tabs.vlan_tab import VlanTab
 from .tabs.routing_tab import RoutingTab
 from .tabs.switching_tab import SwitchingTab

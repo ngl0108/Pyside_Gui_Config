@@ -39,7 +39,7 @@ ui/
 core/
 ├── __init__.py                 ✅
 ├── cli_analyzer.py             ✅ (481 lines - CLI 분석)
-├── command_generator.py        ✅ (300+ lines - 명령어 생성)
+├── device_manager.py        ✅ (300+ lines - 명령어 생성)
 ├── config_diff.py              ✅ (262 lines - 구성 비교)
 ├── connection_manager.py       ✅ (669 lines - 연결 관리)
 ├── templates.py                ✅ (611 lines - 템플릿)
@@ -76,7 +76,7 @@ PyYAML>=6.0                 ✅
 
 ### 4. Core 모듈들
 - cli_analyzer.py: ✅ 정규표현식 패턴 검증
-- command_generator.py: ✅ OS별 명령어 생성 확인
+- device_manager.py: ✅ OS별 명령어 생성 확인
 - config_diff.py: ✅ 비교 로직 완성
 - connection_manager.py: ✅ Netmiko 폴백 처리
 - templates.py: ✅ 내장 템플릿 5종 포함
@@ -117,8 +117,8 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from core.command_generator import CiscoCommandGenerator
-from core.cli_analyzer import CLIAnalyzer
+from core.device_manager import CiscoCommandGenerator
+from core.network_utils import CLIAnalyzer
 ```
 
 **UI 모듈에서 탭 import:**

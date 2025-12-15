@@ -12,12 +12,24 @@ from PySide6.QtWidgets import QApplication
 sys.path.append(os.path.join(current_dir, 'ui'))
 sys.path.append(os.path.join(current_dir, 'core'))
 
-from ui.main_window import MainWindow
 
-if __name__ == "__main__":
+def main():
+    """메인 함수"""
+    # 에러 핸들러 먼저 임포트 (중요!)
+    from error_handler import error_handler
+
+    # QApplication 생성
     app = QApplication(sys.argv)
     app.setApplicationName("Cisco Config Manager")
-    app.setApplicationVersion("1.0")
+    app.setApplicationVersion("1.0 - 오류 알림 버전")
+
+    # 메인 윈도우 생성
+    from ui.main_window import MainWindow
     window = MainWindow()
     window.show()
-    sys.exit(app.exec())
+
+    return app.exec()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

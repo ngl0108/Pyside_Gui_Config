@@ -30,7 +30,7 @@
 ### 핵심 로직 (core/)
 - [x] `__init__.py` - Core 패키지 초기화
 - [x] `cli_analyzer.py` - CLI 출력 분석기 (481 lines)
-- [x] `command_generator.py` - Cisco 명령어 생성기 (300+ lines)
+- [x] `device_manager.py` - Cisco 명령어 생성기 (300+ lines)
 - [x] `config_diff.py` - 구성 비교 및 차이 분석 (262 lines)
 - [x] `connection_manager.py` - 장비 연결 관리 (669 lines)
 - [x] `templates.py` - 구성 템플릿 관리 (611 lines)
@@ -60,7 +60,7 @@
 | dialogs.py | 599 | 다이얼로그들 |
 | cli_analyzer.py | 481 | CLI 분석 |
 | validators.py | 481 | 입력 검증 |
-| command_generator.py | 300+ | 명령어 생성 |
+| device_manager.py | 300+ | 명령어 생성 |
 | config_diff.py | 262 | 구성 비교 |
 | 탭 모듈들 | ~1,000 | 8개 탭 |
 
@@ -148,7 +148,7 @@ cisco-config-manager/
 └── 📁 core/                        # Business Logic
     ├── 📄 __init__.py             # Package init
     ├── 📄 cli_analyzer.py         # CLI parser (481 lines)
-    ├── 📄 command_generator.py    # Command generator (300+ lines)
+    ├── 📄 device_manager.py    # Command generator (300+ lines)
     ├── 📄 config_diff.py          # Config comparison (262 lines)
     ├── 📄 connection_manager.py   # Connection manager (669 lines)
     ├── 📄 templates.py            # Template system (611 lines)

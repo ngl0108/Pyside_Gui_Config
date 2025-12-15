@@ -45,7 +45,7 @@ ui/
 core/
 ├── __init__.py                 ✅
 ├── cli_analyzer.py             ✅ 481 lines
-├── command_generator.py        ✅ 300+ lines
+├── device_manager.py        ✅ 300+ lines
 ├── config_diff.py              ✅ 262 lines
 ├── connection_manager.py       ✅ 669 lines
 ├── templates.py                ✅ 611 lines
